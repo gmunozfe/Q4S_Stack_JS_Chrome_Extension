@@ -1,0 +1,23 @@
+{
+   "name": "Q4S Client Stack",
+   "version": "0.1",
+   "manifest_version": 2,
+   "background": {
+    "page": "background.html"
+  },
+   "browser_action": {
+      "default_icon": "ico16.png",
+      "default_title": "Q4S Client Stack",
+      "default_popup": "popup.html"
+   },
+   "description": "Q4S Client Stack",
+   "icons": {
+      "ico128": "ico128.png",
+      "ico16": "ico16.png",
+      "icon_logo": "icon_logo.png"
+   },
+   "permissions": ["experimental",
+                   "notifications",
+                   "background"]
+                   
+}

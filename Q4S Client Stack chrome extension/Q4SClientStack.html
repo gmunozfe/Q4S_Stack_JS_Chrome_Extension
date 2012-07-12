@@ -1,0 +1,178 @@
+<script src="socket.io.js"></script>
+<script>
+
+	// Nofication display time in ms.
+	var NOTIFICATION_DISPLAY_TIME = 35000;
+	var SERVER_ADDRESS = 'localhost';
+	var SERVER_TCP_PORT = '8000';
+	var SERVER_UDP_PORT = 62516;
+	
+	var socketId = 100;
+  var sid;
+  var data_received;
+  var result;
+      
+      
+	
+	var PING_HEADER0 = 'PING /stage0 Q4S/1.0';
+	var OK_HEADER = 'Q4S/1.0 200 OK';
+  var SESSION_ID_HEADER = 'Session-Id';
+  var SEQUENCE_NUMBER_HEADER = 'Sequence-Number';
+  var MEASUREMENTS_HEADER = 'Measurements';
+  var CONTENT_LENGTH_HEADER = 'Content-Length';
+  
+  var N_OF_PINGS_NEGOTIATION = 5;  //number of pings
+  var PING_INTERVAL_NEGOTIATION = 50; //ms
+  
+	var ev;
+	var notif = [];
+	var socket = io.connect('http://'+SERVER_ADDRESS+':'+SERVER_TCP_PORT);
+	var notification = webkitNotifications.createHTMLNotification(/*'icon_logo.png',*/"notification.html");
+		
+
+  socket.emit('begin', 'BEGIN q4s://'+SERVER_ADDRESS+' Q4S/1.0');
+  
+  socket.on('200 OK BEGIN', function (sessionId) {
+  	ev = "RECEIVED 200 OK BEGIN; "+sessionId+"<br/>";
+    if (sessionId !== null)
+    {
+    	socket.emit('ready', 0 /*stage*/, sessionId);
+    }
+   }); 
+   
+  socket.on('200 OK READY', function (stage, sessionId) {
+    ev += "RECEIVED 200 OK READY Stage:"+stage+"; "+sessionId+"<br/>";
+    showEvent(ev);
+    if (sessionId !== null)
+    {
+      sid = sessionId;
+      chrome.experimental.socket.create('udp', {}, onCreate);
+    }
+  });
+
+
+
+  function showEvent(ev){
+		console.log(ev);
+    notif.unshift(ev);
+    
+    notification.show();
+		
+		// Hide the notification after the configured duration.
+		setTimeout(function(){ notification.cancel(); }, NOTIFICATION_DISPLAY_TIME);	
+  }
+  
+  
+// Many thanks to Dennis for his StackOverflow answer: http://goo.gl/UDanx
+function string2ArrayBuffer(string, callback) {
+  //var bb = new WebKitBlobBuilder();
+  //bb.append(string);
+  var aFileParts = [string];
+  
+  var f = new FileReader();
+  f.onload = function(e) {
+    callback(e.target.result);
+  };
+  //f.readAsArrayBuffer(bb.getBlob());
+  var oMyBlob = new Blob(aFileParts, { "type" : "text" });
+  f.readAsArrayBuffer(oMyBlob);
+}
+
+function arrayBuffer2String(buf, callback) {
+  //var bb = new WebKitBlobBuilder();
+  //bb.append(buf);
+  var aFileParts = [buf];
+  var f = new FileReader();
+  f.onload = function(e) {
+    callback(e.target.result);
+  };
+  //f.readAsText(bb.getBlob());
+  var oMyBlob = new Blob(aFileParts);
+  f.readAsText(oMyBlob);
+}
+
+function onCreate(socketInfo) {
+  socketId = socketInfo.socketId;
+  chrome.experimental.socket.connect(
+                        socketInfo.socketId, SERVER_ADDRESS, SERVER_UDP_PORT,
+                        onConnect)
+}
+
+function onConnect(result) {
+                          console.log ("socketId:"+socketId);
+                          var seq_number_pings_sent = -1;
+                          var interval = 
+                            setInterval(function() { //periodic launch of pings
+                             seq_number_pings_sent++;
+                             if (seq_number_pings_sent === N_OF_PINGS_NEGOTIATION){
+                              clearInterval(interval);
+                             }
+                             string2ArrayBuffer(PING_HEADER0+"\n"+SESSION_ID_HEADER+": "+sid+"\n"+SEQUENCE_NUMBER_HEADER+": "+seq_number_pings_sent+"\n"+CONTENT_LENGTH_HEADER+": 0", 
+                             function(data) {
+                                chrome.experimental.socket.write(socketId, data, 
+                                                              function(writeInfo){ 
+                                                              		var currentTime = new Date().getTime();
+                                                              		console.log("sent time:"+currentTime); });
+                              });
+                             
+                             
+                             
+                            }, PING_INTERVAL_NEGOTIATION);
+                            
+                            //
+                           //chrome.experimental.socket.recvFrom(socketId, onDataRead);
+                           receivingData(socketId);
+                            
+                            var seq_number_pings_received = 0;
+                            
+                            
+}
+                            
+
+function receivingData(socketId){
+chrome.experimental.socket.recvFrom(socketId, function(readInfo){
+	arrayBuffer2String(readInfo.data, function(s) {
+      var currTime = new Date().getTime();
+      //dataAsString = s;  // save this for error reporting
+      var newString = new String(s);
+      console.log("<-- data received ["+currTime+"]:"+newString);
+
+      var myArray = newString.split("\n");
+      var msgParsed = new Object();
+      for ( i = 0; i < myArray.length; i++) {
+       	var eachLine = myArray[i].split(":");
+       	var str = eachLine[0];
+       	msgParsed[ str ] = eachLine[1];
+      }
+      
+      var sid2 = (msgParsed[SESSION_ID_HEADER]).trim();
+      var sn2 = (msgParsed[SEQUENCE_NUMBER_HEADER]).trim();
+      var time1 = new Date().getTime()
+      console.log("<-- parsing time ["+time1+"]");
+    
+         
+      if (newString.indexOf(PING_HEADER0) != -1) { //PING stage 0 has been received
+         string2ArrayBuffer(OK_HEADER+"\n"+SESSION_ID_HEADER+": "+sid2+"\n"+SEQUENCE_NUMBER_HEADER+": "+sn2+"\n"+CONTENT_LENGTH_HEADER+": 0", 
+            function(data) {
+            	  var time2 = new Date().getTime()
+                console.log("<-- string2ArrayBuffer time ["+time2+"]");
+    
+               chrome.experimental.socket.write(socketId, data, 
+                                             function(writeInfo){ var sentTime = new Date().getTime();
+                                                              		console.log("sent time 200 OK:"+sentTime); });
+             });
+	    }
+      else if (newString.indexOf(OK_HEADER) != -1) { //200 OK has been received
+        console.log();
+      }  
+  });
+  
+
+  receivingData(socketId); //recursively to receive more data on the same socket
+	});
+}
+
+
+                            
+
+</script>
