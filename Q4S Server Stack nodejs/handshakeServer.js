@@ -9,10 +9,10 @@ var MEASUREMENTS_HEADER = 'Measurements';
 var TIMESTAMP_HEADER = 'Timestamp';
 var CONTENT_LENGTH_HEADER = 'Content-Length';
 
-var N_OF_PINGS_NEGOTIATION_SERVER = 255;  //number of pings
-var PING_INTERVAL_NEGOTIATION_SERVER = 50; //ms
+var N_OF_PINGS_NEGOTIATION_SERVER = 255;  //255 //number of pings
+var PING_INTERVAL_NEGOTIATION_SERVER = 50; //50; //ms
 
-var N_OF_PINGS_NEGOTIATION_CLIENT = 255;  //number of pings
+var N_OF_PINGS_NEGOTIATION_CLIENT = 60;  //255 //number of pings
 
 //bandwith measurement negotiation stage 1
 var packetsPerMs = [];
@@ -128,8 +128,13 @@ server.on("message", function (msg, rinfo) {
 	  var sid2 = (msgParsed[SESSION_ID_HEADER]).trim();
 	  var sn2 = (msgParsed[SEQUENCE_NUMBER_HEADER]).trim();
 	  
+	  var timest = (msgParsed[TIMESTAMP_HEADER]);
+      if (timest){
+      	timest.trim();}
+	  
 	
 	if (newString.indexOf(PING_HEADER0) != -1){ //PING stage 0 has been received
+		//console.log("<-- PING received ["+currTime+"]\n"+msg+"\n"); 
 	  if (sessionMgm.hasBegunNegotiation(sid2) == null){ //only first time
 	  	  sessionMgm.beginNegotiation(sid2);
 	  	  //begin to send pings to client
@@ -146,7 +151,8 @@ server.on("message", function (msg, rinfo) {
              var measurements = MEASUREMENTS_HEADER+": l="+sessionMgm.uplinkLatency(sid2)+", j="+sessionMgm.uplinkJitter(sid2);
              
              if (seq_number_pings_sent === N_OF_PINGS_NEGOTIATION_SERVER){ //last ping, calculate packetloss for sending it
-                measurements += ", pl="+sessionMgm.uplinkPacketLoss(sid2, sn2);
+             	  sessionMgm.calculateUplinkPacketLossPing(sid2);
+                measurements += ", pl="+sessionMgm.uplinkPacketLoss(sid2);
              }
              
              var ping_from_server = PING_HEADER0+"\n"+SESSION_ID_HEADER+": "+sid2+"\n"+SEQUENCE_NUMBER_HEADER+": "+seq_number_pings_sent+"\n"+
@@ -158,7 +164,7 @@ server.on("message", function (msg, rinfo) {
         
 	  	
 	  }
-	  sessionMgm.pingReceivedTime(sid2, sn2, currTime);
+	  sessionMgm.pingReceivedTime(sid2, sn2, currTime, timest);
 	  
 	  
 	  var response_200_OK = OK_HEADER+"\n"+SESSION_ID_HEADER+": "+sid2+"\n"+SEQUENCE_NUMBER_HEADER+": "+sn2+"\n"+CONTENT_LENGTH_HEADER+": 0";
@@ -168,15 +174,17 @@ server.on("message", function (msg, rinfo) {
 		sessionMgm.rtt(sid2, sn2, currTime);
 	}
 	else if (newString.indexOf(BWIDTH_HEADER) != -1) { //BWIDTH has been received
+		//console.log("<-- BW Message received: ["+currTime+"]: "+sn2);
+        
 		if (sessionMgm.hasBegunStage1(sid2) == null){ //only first time
 	  	  sessionMgm.beginStage1(sid2, sn2);
 	  	  
-	  	  var BWIDTH_CONSTRAINT = 5000; //kbps
-	      var bwf = BWIDTH_CONSTRAINT/8;  //KBps i.e., packets per seconds
+	  	  var BWIDTH_CONSTRAINT = 2000; //kbps
+	      var bwf = BWIDTH_CONSTRAINT*1024/(8*4000);  //KBps i.e., packets per seconds
 	      packetsPerMs[sid2] = bwf/1000*1.01;
 	      
 	      //bwidthIntervalTimer[sid2] = Math.ceil(24*packetsPerMs[sid2]); //ms
-	      bwidthIntervalTimer[sid2] = 15;//Math.ceil(1/packetsPerMs[sid2]); //ms
+	      bwidthIntervalTimer[sid2] = 12;//Math.ceil(1/packetsPerMs[sid2]); //ms
 	      var bwidthWindow = 5000;
 	  	  packets2Send[sid2] = Math.ceil(bwidthIntervalTimer[sid2]*packetsPerMs[sid2]/**1.02*/); //Average
 	  	  packets2SendPerInterval[sid2] = packets2Send[sid2]; //for tunning in each interval
@@ -189,16 +197,10 @@ server.on("message", function (msg, rinfo) {
              bwBeginningTime[sid2] = new Date().getTime();
              ready2send_bw_message (sid2, rinfo.address, rinfo.port);
              }, bwidthIntervalTimer[sid2]);
-             
-	  	  
-	  	  
-	  	  /*setTimeout( function(){
-	  	  	console.log("BW: "+sessionMgm.uplinkBW(sid2)+" kbps");
-	  	  	}, BWIDTH_WINDOW+2000);*/
 	  }
 	  
 		sessionMgm.bwMsgReceived(sid2, sn2, currTime);
-		//console.log("BW: "+sessionMgm.uplinkBW(sid2)+" kbps");
+		//console.log("BW: "+sessionMgm.uplinkBW(sid2)+" kbps   pl="+sessionMgm.uplinkPacketLoss(sid2));
 	}
 	
 	
@@ -225,12 +227,12 @@ function send_bw_message(sess, ip, port){
 	counterSentPackets[sess]++;
   seq_number_bw_sent[sess]++;
   
-  var bw_measurements = MEASUREMENTS_HEADER+": bw="+uplinkBW[sess];//+sessionMgm.uplinkBW(sess);
+  var bw_measurements = MEASUREMENTS_HEADER+": bw="+uplinkBW[sess]+", pl="+sessionMgm.uplinkPacketLoss(sess);
   
 	var bw_message = BWIDTH_HEADER+"\n"+SESSION_ID_HEADER+": "+sess+"\n"+SEQUENCE_NUMBER_HEADER+": "+seq_number_bw_sent[sess]+"\n"+bw_measurements+"\n"+CONTENT_LENGTH_HEADER+": ";
 	var strLen = bw_message.length+4; //4 bytes for content-length field
   var auxStr = '';
-	for (var i=strLen; i<1024; i++) {
+	for (var i=strLen; i<4000; i++) {
      auxStr += String.fromCharCode( '0x41'/*'0xCF'*/ );
   }
   bw_message += auxStr.length+"\n"+auxStr;
@@ -242,14 +244,14 @@ function send_bw_to_client(sess, bw_message, ip, port){
   var message = new Buffer(bw_message);
 	server.send(message, 0, message.length, port, ip, function() {
     // message has been flushed to the kernel
-    
+    //console.log("--> bw message sent to "+ip+":"+port+":"+message);
     if (counterSentPackets[sess] === packets2SendPerInterval[sess]){ 
       	 //sleep;
       	 sentBWMessagesTime[sess] = new Date().getTime();  
          bwTimeOut[sess] = bwidthIntervalTimer[sess]-(sentBWMessagesTime[sess]-wakeUpTime[sess]);
          if (bwTimeOut[sess] < 0){
          	  bwTimeOut[sess] = 0;}
-         //console.log("Time after sending "+counterSentPackets[sess]+" packets:"+(sentBWMessagesTime[sess]-wakeUpTime[sess])+" bwTimeOut:"+bwTimeOut[sess]);
+         //console.log("Time after sending "+counterSentPackets[sess]+" packets ["+seq_number_bw_sent[sess]+"]: "+(sentBWMessagesTime[sess]-wakeUpTime[sess])+" bwTimeOut:"+bwTimeOut[sess]);
          
          if (seq_number_bw_sent[sess] < numOfPackets[sess]){
            setTimeout(function(){
@@ -257,12 +259,9 @@ function send_bw_to_client(sess, bw_message, ip, port){
          	   }, bwTimeOut[sess]);
          } else{
            console.log("Total time per "+(seq_number_bw_sent[sess]+1)+" BW messages:"+(sentBWMessagesTime[sess]-bwBeginningTime[sess]));}
-         //setTimeout(function(){
-         //  showEvent("Negotiation Stage 0 finished", 'BandWith:'+seq_number_bw_sent+' PacketLoss: '+uplink_packet_loss+'/'+download_packet_loss+' (%)');
-         //}, 1000);
       }
       else{
-         send_bw_message(sess, ip, port); //recursively
+        send_bw_message(sess, ip, port); //recursively
    	  }
     });
 } 

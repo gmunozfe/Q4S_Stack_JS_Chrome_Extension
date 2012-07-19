@@ -1,16 +1,18 @@
   // Nofication display time in ms.
 	var NOTIFICATION_DISPLAY_TIME = 15000;
-	var SERVER_ADDRESS = 'localhost';
-	var SERVER_TCP_PORT = '8000';
-	var SERVER_UDP_PORT = 62516;
+	var SERVER_ADDRESS = localStorage.serverAddress;//'localhost';
+	console.log("SERVER_ADDRESS:"+SERVER_ADDRESS);
+	var SERVER_TCP_PORT = localStorage.serverTCPPort;//'8000';
+	var SERVER_UDP_PORT = parseInt(localStorage.serverUDPPort);//62516;
 	
 	var socketId; //For the UDP connection
   var sid;
   var data_received;
   var result;
       
-      
-	
+  var LINE_SEPARATOR = '\n';    
+	var BEGIN_HEADER0 = 'BEGIN q4s://';
+	var BEGIN_HEADER1 = ' Q4S/1.0\n';
 	var PING_HEADER0 = 'PING /stage0 Q4S/1.0';
 	var BWIDTH_HEADER = 'BWIDTH /stage1 Q4S/1.0';
 	var OK_HEADER = 'Q4S/1.0 200 OK';
@@ -19,26 +21,45 @@
   var MEASUREMENTS_HEADER = 'Measurements';
   var TIMESTAMP_HEADER = 'Timestamp';
   var CONTENT_LENGTH_HEADER = 'Content-Length';
+  var CONTENT_TYPE_HEADER = 'Content-Type: application/sdp';
+    
+  var BWIDTH_CONSTRAINT = parseInt(localStorage.appBwConstraintClient); //1000 kbps
+    
+  var SDP_0 = 'v=0'+LINE_SEPARATOR+'o=q4s-UA '+navigator.userAgent+LINE_SEPARATOR+'s=Q4S'+LINE_SEPARATOR+'i=Q4S parameters'+LINE_SEPARATOR;
+  var SDP_APP_ALERT_PAUSE = 'a=app-alert-pause:'+parseInt(localStorage.appAlertPause)+LINE_SEPARATOR;
+  var SDP_APP_CONSTRAINTS = 'a=application:latency:'+parseInt(localStorage.appLatencyConstraint)+LINE_SEPARATOR+
+                            'a=applicacion:jitter:'+parseInt(localStorage.appJitterConstraintClient)+'/'+parseInt(localStorage.appJitterConstraintServer)+LINE_SEPARATOR+
+                            'a=applicacion:bandwidth:'+parseInt(localStorage.appBwConstraintClient)+'/'+parseInt(localStorage.appBwConstraintServer)+LINE_SEPARATOR+
+                            'a=applicacion:packetloss:'+parseFloat(localStorage.appPacketLossConstraintClient)+'/'+parseFloat(localStorage.appPacketLossConstraintServer)+LINE_SEPARATOR;
+  var SDP_PROCEDURE_DEFAULT = 'a=measurement:procedure default('+parseInt(localStorage.negPingIntervalClient)+'/'+parseInt(localStorage.negPingIntervalServer)+','
+                                                                +parseInt(localStorage.contPingIntervalClient)+'/'+parseInt(localStorage.contPingIntervalServer)+','
+                                                                +parseInt(localStorage.bwTime)+','
+                                                                +parseInt(localStorage.pingWindowClient)+'/'+parseInt(localStorage.pingWindowServer)+','
+                                                                +parseInt(localStorage.packetlossWindowServer)+'/'+parseInt(localStorage.packetlossWindowServer)+')';
   
-  var N_OF_PINGS_NEGOTIATION_CLIENT = 255;  //number of pings
-  var PING_INTERVAL_NEGOTIATION_CLIENT = 49;//50; //ms including proccesing time: 50-1
+  var N_OF_PINGS_NEGOTIATION_CLIENT = parseInt(localStorage.pingWindowClient)-1; //255 //number of pings //begins at 0
+  var PING_INTERVAL_NEGOTIATION_CLIENT = parseInt(localStorage.negPingIntervalClient)-1;//49;//50; //ms including proccesing time: 50-1
   
-  var BWIDTH_CONSTRAINT = 5000; //kbps
+  var BWIDTH_MESSAGE_LENGTH = 4096;
   
   var seq_number_bw_sent = -1;
   var counterSentPackets =  0;
-  var bwf = BWIDTH_CONSTRAINT/8;  //KBps i.e., packets per seconds
+  var bwf = BWIDTH_CONSTRAINT/32;  //KBps i.e., packets per seconds (/8 if packets are 1 KB, /32 if packets are 4 KB length)
 	var packetsPerMs = bwf/1000;
 	var BWIDTH_INTERVAL_TIMER;
 	if (BWIDTH_CONSTRAINT <= 1000)
-	  BWIDTH_INTERVAL_TIMER = Math.ceil(1/packetsPerMs); //ms
-	else if (BWIDTH_CONSTRAINT <= 3000)
-		BWIDTH_INTERVAL_TIMER = Math.ceil(48*packetsPerMs); //ms
+	  BWIDTH_INTERVAL_TIMER = 150;//Math.ceil(1/packetsPerMs); //ms
+	else if (BWIDTH_CONSTRAINT < 3000)
+		BWIDTH_INTERVAL_TIMER = 30; //Math.ceil(192*packetsPerMs); //ms //48
+  else if (BWIDTH_CONSTRAINT < 5000)
+  	BWIDTH_INTERVAL_TIMER = 20; //Math.ceil(386*packetsPerMs); //ms //24
   else
-  	BWIDTH_INTERVAL_TIMER = Math.ceil(24*packetsPerMs); //ms
+  	BWIDTH_INTERVAL_TIMER = 17;
   
 	var wakeUpTime;
 	var numOfPackets;
+	var uplinkBW;
+	var downlinkBW;
 	var BWIDTH_WINDOW = 5000;
 	
   
@@ -55,7 +76,7 @@
 	var uplink_jitter;
 	var latency;
 	var seq_received_pings = [];
-	var download_packet_loss;
+	var downlink_packet_loss;
 	var uplink_packet_loss;
 	
 	var packets2SendPerInterval;
@@ -67,10 +88,11 @@
 	
 	var socket = io.connect('http://'+SERVER_ADDRESS+':'+SERVER_TCP_PORT);
 	//var notification = webkitNotifications.createHTMLNotification(/*'icon_logo.png',*/"notification.html");
-	 
-		
-
-  socket.emit('begin', 'BEGIN q4s://'+SERVER_ADDRESS+' Q4S/1.0\n');
+	
+	var sdp = SDP_0+SDP_APP_ALERT_PAUSE+SDP_APP_CONSTRAINTS+SDP_PROCEDURE_DEFAULT;
+	var contentLengthBegin = CONTENT_LENGTH_HEADER+": "+sdp.length;
+  var beginMsg = BEGIN_HEADER0+SERVER_ADDRESS+BEGIN_HEADER1+"\n"+CONTENT_TYPE_HEADER+"\n"+contentLengthBegin+"\n"+sdp;
+  socket.emit('begin', beginMsg);
   
   socket.on('200 OK BEGIN', function (sessionId) {
   	//showEvent("Handshake", "OK");
@@ -99,7 +121,7 @@
   		bwOriginTime = new Date().getTime();
   		bwBeginningTime = bwOriginTime;
       
-      packets2SendPerInterval = Math.ceil(BWIDTH_INTERVAL_TIMER*packetsPerMs*1.06);
+      packets2SendPerInterval = Math.ceil(BWIDTH_INTERVAL_TIMER*packetsPerMs*1.01);
 	    numOfPackets = Math.ceil(BWIDTH_WINDOW * packets2SendPerInterval / BWIDTH_INTERVAL_TIMER);
 	
   		setTimeout(function(){
@@ -133,13 +155,13 @@ function str2ab(str) {
 }
 
 function str2ab_1024length(str) {
-  var buf = new ArrayBuffer(1024); 
+  var buf = new ArrayBuffer(BWIDTH_MESSAGE_LENGTH); 
   var bufView = new Uint8Array(buf);
   var strLen=str.length;
   for (var i=0; i<strLen; i++) {
     bufView[i] = str.charCodeAt(i);
   }
-  for (var i=strLen; i<1024; i++) {
+  for (var i=strLen; i<BWIDTH_MESSAGE_LENGTH; i++) {
    	bufView[i] = '0xCF';
   }
   return buf;
@@ -180,8 +202,8 @@ function onConnect(result) {
                              seq_number_pings_sent++;
                              if (seq_number_pings_sent > N_OF_PINGS_NEGOTIATION_CLIENT){
                                 clearInterval(ping_interval);
-                                showEvent("Negotiation Stage 0 finished", 'Latency: '+latency+' ms; Jitter: '+uplink_jitter+'/'+downlink_jitter+' PacketLoss: '+uplink_packet_loss+'/'+download_packet_loss+' (%)');
                                 setTimeout(function(){
+                                	showEvent("Negotiation Stage 0 finished", 'Latency: '+latency+' ms; Jitter: '+uplink_jitter+'/'+downlink_jitter+' PacketLoss: '+uplink_packet_loss+'/'+downlink_packet_loss+' (%)');
                                 	//begin negotiation stage 1
                                 	negotiation_Stage1(sid);
                                 	}, 1000);
@@ -191,13 +213,13 @@ function onConnect(result) {
                                
                                if (seq_number_pings_sent === N_OF_PINGS_NEGOTIATION_CLIENT){
                                  var last_ping_received = seq_received_pings[seq_received_pings.length-1];
-                                 //last_ping_received++; //sequence begins at 0, but not added because it has not push into the stack yet
-                                 download_packet_loss = 100 - (100*seq_received_pings.length/last_ping_received);
-                                 measurements +=", pl="+download_packet_loss;
+                                 //last_ping_received++; //sequence begins at 0, but not added because it has not been pushed into the stack yet
+                                 downlink_packet_loss = 100 - (100*seq_received_pings.length/last_ping_received);
+                                 measurements +=", pl="+downlink_packet_loss;
                                }
                                
                                 
-                                var ab = str2ab(PING_HEADER0+"\n"+SESSION_ID_HEADER+": "+sid+"\n"+SEQUENCE_NUMBER_HEADER+": "+seq_number_pings_sent+"\n"+measurements+"\n"+CONTENT_LENGTH_HEADER+": 0");
+                                var ab = str2ab(PING_HEADER0+"\n"+SESSION_ID_HEADER+": "+sid+"\n"+SEQUENCE_NUMBER_HEADER+": "+seq_number_pings_sent+"\n"+measurements+"\n"+TIMESTAMP_HEADER+": "+intervalTime+"\n"+CONTENT_LENGTH_HEADER+": 0");
                                 var str2abTime = new Date().getTime();
                                 chrome.experimental.socket.write(socketId, ab, 
                                                               function(writeInfo){ 
@@ -223,8 +245,11 @@ function onConnect(result) {
 
 function receivingData(socketId){
 chrome.experimental.socket.recvFrom(socketId, function(readInfo){
+	if (readInfo.port === 0)
+		return;
       var currTime = new Date().getTime();
       var newString = ab2str(readInfo.data);
+      //console.log("receiving:"+readInfo+" resultCode:"+readInfo.resultCode+" address:"+readInfo.address+" port:"+readInfo.port+" data:"+newString);
 	    
 	    //var timeAB2str = new Date().getTime();
       
@@ -239,7 +264,19 @@ chrome.experimental.socket.recvFrom(socketId, function(readInfo){
       }
       
       var sid2 = (msgParsed[SESSION_ID_HEADER]).trim();
+      //if (sid2){
+      //  sid2.trim();}
+        
       var sn2 = (msgParsed[SEQUENCE_NUMBER_HEADER]).trim();
+      /*try{
+      	sn2 
+      } catch (err)
+      {
+      	console.log("ERROR:"+err+"; "+newString);
+      }*/
+     // if (sn2){
+     //   sn2.trim();}
+        
       var meas = (msgParsed[MEASUREMENTS_HEADER]);
       if (meas){
         meas.trim();
@@ -253,9 +290,14 @@ chrome.experimental.socket.recvFrom(socketId, function(readInfo){
        uplink_jitter = (measParsed[' j'])
        if (uplink_jitter)
         	uplink_jitter.trim();
+        	
        uplink_packet_loss = (measParsed[' pl'])
        if (uplink_packet_loss)
         	uplink_packet_loss.trim();
+       
+       uplinkBW = (measParsed[' bw'])
+       if (uplinkBW)
+         uplinkBW.trim();
       }
       var timest = (msgParsed[TIMESTAMP_HEADER]);
       if (timest){
@@ -265,7 +307,7 @@ chrome.experimental.socket.recvFrom(socketId, function(readInfo){
       
          
       if (newString.indexOf(PING_HEADER0) != -1) { //PING stage 0 has been received
-        //console.log("<-- PING received ["+currTime+"]:");//+newString);
+        //console.log("<-- PING received ["+currTime+"]:"+newString);
         //console.log("<-- PING parsing time ["+time1+"]");
     
             
@@ -302,11 +344,14 @@ chrome.experimental.socket.recvFrom(socketId, function(readInfo){
         //console.log();
       }
       else if (newString.indexOf(BWIDTH_HEADER) != -1) { //BWIDTH has been received
-        //console.log("<-- BW Message received:"+newString);
         bwMsgReceived[sn2]=currTime;
         bwMsgCounter++;
-        var downlinkBW = 8*1024*bwMsgCounter/(bwMsgReceived[sn2]-bwMsgReceived[0]);
-        console.log("downlink BW:"+ Math.round(downlinkBW*100)/100+"  counter:"+bwMsgCounter+"  seqNumber:"+sn2);
+        downlinkBW = Math.round(8*4000*bwMsgCounter*100/(bwMsgReceived[sn2]-bwMsgReceived[0]))/100;
+        var expectedReceivedPackets = parseInt(sn2)+1;
+        downlink_packet_loss = Math.round((10000*(expectedReceivedPackets-bwMsgCounter))/expectedReceivedPackets)/100;
+        console.log("<-- BW Message received ["+currTime+"]: "+sn2+";  "+downlink_packet_loss);
+        
+        //console.log("downlink BW:"+ downlinkBW+"  counter:"+bwMsgCounter+"  seqNumber:"+sn2+" expected:"+expectedReceivedPackets+" downlink_pl:"+downlink_packet_loss);
       }  
   
   
@@ -332,10 +377,12 @@ function sendBWidthMessages(packets2Send){
 	
 	counterSentPackets++;
   seq_number_bw_sent++;
+                                 
   var measurements = MEASUREMENTS_HEADER+": bw=";//+latency+", j="+downlink_jitter
+  measurements +=", pl="+downlink_packet_loss;
   
   var bwMessage = BWIDTH_HEADER+"\n"+SESSION_ID_HEADER+": "+sid+"\n"+SEQUENCE_NUMBER_HEADER+": "+seq_number_bw_sent+"\n"+measurements+"\n"+CONTENT_LENGTH_HEADER+": ";
-  var contentLength = 1024-bwMessage.length-4; //4 bytes for content-length
+  var contentLength = BWIDTH_MESSAGE_LENGTH-bwMessage.length-4; //4 bytes for content-length
   bwMessage += contentLength+"\n";
   
                                        
@@ -356,14 +403,17 @@ function sendBWidthMessages(packets2Send){
                                          setTimeout(function(){
                                        	   ready2SendBWidthMessages();
                                        	   }, timeo);
-                                       } else
+                                       } else{
                                        	 console.log("Total time per "+(seq_number_bw_sent+1)+" BW messages:"+(currentTime-bwBeginningTime));
-                                       //setTimeout(function(){
-                                       //  showEvent("Negotiation Stage 0 finished", 'BandWith:'+seq_number_bw_sent+' PacketLoss: '+uplink_packet_loss+'/'+download_packet_loss+' (%)');
-                                       //}, 1000);
+                                         setTimeout(function(){
+                                           showEvent("Negotiation Stage 1 finished", 'BandWith:'+uplinkBW+'/'+downlinkBW+' (kbps)  PacketLoss: '+uplink_packet_loss+'/'+downlink_packet_loss+' (%)');
+                                         }, 2000);
+                                       }
                                     }
                                     else{
+                                    	setTimeout(function() {
                                        sendBWidthMessages(packets2Send); //recursively
+                                      }, 1);
                                  	  }
                                  });
    

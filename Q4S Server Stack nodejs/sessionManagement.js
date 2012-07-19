@@ -1,8 +1,7 @@
 var sessions = [];
 var count = 0;
+var BWIDTH_MESSAGE_LENGTH_CLIENT = 4096;
 
-var PING_INTERVAL_NEGOTIATION_CLIENT = 50; //ms
- 
 
 var sessionManagement = {
   indexOf: function(sessionId) {
@@ -14,6 +13,7 @@ var sessionManagement = {
   },
   add: function(sessionId) {
     sessionId.pingReceived = [];
+    sessionId.pingTimestamp = [];
     sessionId.pingSent = [];
     sessionId.pingElapsed = [];
     sessionId.rtt = [];
@@ -68,22 +68,20 @@ var sessionManagement = {
         return null;
     }
   },
-  pingReceivedTime: function(sessionId, seqNumber, timeReceived) {
+  pingReceivedTime: function(sessionId, seqNumber, timeReceived, timestamp) {
   	var session = this.getSessionById(sessionId);
     if(session != null) {
         session.pingReceived[seqNumber] = timeReceived;
+        session.pingTimestamp[seqNumber] = timestamp;
         session.seq_received_pings.push(seqNumber);
         if (seqNumber>0){
-        	session.pingElapsed.push(Math.abs(session.pingReceived[seqNumber]-session.pingReceived[seqNumber-1]-PING_INTERVAL_NEGOTIATION_CLIENT));
+        	session.pingElapsed.push(Math.abs(session.pingReceived[seqNumber]-session.pingReceived[seqNumber-1]-(session.pingTimestamp[seqNumber]-session.pingTimestamp[seqNumber-1])));
         	session.jitter = Math.round((this.mean(session.pingElapsed))*100)/100; //mean of the elapsed time between pings reception
         	session.latency = Math.round(session.rttMedian/2);
         }
     } else {
         console.log("session "+sessionId+" NULL");
     }
-    //for(var j=0;j<session.pingReceived.length;j++){
-    //  console.log("******** session.pingReceived["+j+"] is:"+session.pingReceived[j]);
-    //}
   },
   pingSentTime: function(sessionId, seqNumber, timeSent) {
     //console.log("******** seqNumber:"+seqNumber+" timeSent:"+timeSent);
@@ -133,14 +131,21 @@ var sessionManagement = {
     }
     
   },
-  uplinkPacketLoss: function(sessionId) {
+  calculateUplinkPacketLossPing: function(sessionId) {
     var session = this.getSessionById(sessionId);
     if(session != null) {
         var last_ping_received = session.seq_received_pings[session.seq_received_pings.length-1]; 
         last_ping_received++; //sequence begins at 0
         if (last_ping_received >= 0)
-        	packetloss = 100 - (100*session.seq_received_pings.length/last_ping_received); 
-        return packetloss;
+        	session.packetloss = 100 - (100*session.seq_received_pings.length/last_ping_received); 
+    } else {
+        console.log("session "+sessionId+" NULL");
+    }
+  },
+  uplinkPacketLoss: function(sessionId) {
+    var session = this.getSessionById(sessionId);
+    if(session != null) {
+        return session.packetloss;
     } else {
         console.log("session "+sessionId+" NULL");
     }
@@ -198,6 +203,8 @@ var sessionManagement = {
     if(session != null) {
         session.bwMsgReceived[seqNumber]=timeReceived;
         session.bwMsgCounter++;
+        var expectedReceivedPackets = parseInt(seqNumber)+1;
+        session.packetloss = Math.round(10000*(expectedReceivedPackets-session.bwMsgCounter)/(expectedReceivedPackets))/100;
     } else {
         console.log("session "+sessionId+" NULL");
     }
@@ -225,7 +232,7 @@ var sessionManagement = {
 	  	  //console.log("Time for "+this.getBWMsgCounter(sessionId)+" BW Messages: "+(this.getBWMsgReceived(sessionId,(this.getBWMsgCounter(sessionId)-1))-this.getBWMsgReceived(sessionId,this.getFirstBWSeqNumber(sessionId)))+" ms");
 	  	  //
 	  	  // uplinkBW = # bits per byte * BW message Length * # received BW messages / time (last received message - first received message)
-	  	  var uplinkBW = 8*1024*this.getBWMsgCounter(sessionId)/(this.getBWMsgReceived(sessionId,(this.getBWMsgCounter(sessionId)-1))-this.getBWMsgReceived(sessionId,this.getFirstBWSeqNumber(sessionId)));
+	  	  var uplinkBW = 8*BWIDTH_MESSAGE_LENGTH_CLIENT*this.getBWMsgCounter(sessionId)/(this.getBWMsgReceived(sessionId,(this.getBWMsgCounter(sessionId)-1))-this.getBWMsgReceived(sessionId,this.getFirstBWSeqNumber(sessionId)));
         return Math.round(uplinkBW*100)/100;
     } else {
         console.log("session "+sessionId+" NULL");
