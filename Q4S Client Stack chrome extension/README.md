@@ -1,16 +1,16 @@
 
-Q4S Client Stack
-====================
+SmartStream Q4S Client 
+======================
 
 Introduction
 ------------
 
-This is an extension using `chrome.experimental.socket.*`.
+SmartStream is a package application for Chrome implementing a Q4S (Quality for Service) client.
+Q4S is an IETF protocol (http://datatracker.ietf.org/doc/draft-aranda-dispatch-q4s/) for enabling real-time multiplayer games.
+Q4S provides a mechanism for latency, jitter, bandwidth and packet loss negotiation and monitoring, alerting whenever one of the negotiated conditions is violated. .
 
 Usage
 -----
 
-Install on Google Chrome Canary build
-<https://tools.google.com/dlpage/chromesxs>. Allow using experimental
-API on settings page.
+Install on Google Chrome (minimum version 23)
 
