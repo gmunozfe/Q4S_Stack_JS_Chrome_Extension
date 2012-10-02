@@ -1,0 +1,194 @@
+body {
+    background: rgb(247, 247, 247);
+    border: 1px solid rgba(147, 184, 189,0.8);
+    box-shadow:
+        0pt 2px 5px rgba(105, 108, 109,  0.7), 
+        0px 0px 8px 5px rgba(208, 223, 226, 0.4) inset;
+}
+
+#q4s_logo{
+margin-left: 50px;
+}
+
+#q4s_motto{
+font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 18px;
+font-style: italic;
+margin-left: 50px; 
+}
+
+#buttons_start_stop{
+margin-top: 45px;
+}
+
+button {
+background: #fa1155;
+-moz-border-radius: 20px;
+-webkit-border-radius: 20px;
+-khtml-border-radius: 20px;
+border-radius: 20px;
+color: #ffffee;
+font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size:18px;
+letter-spacing: 2px;
+margin: auto;
+padding: 7px 25px;
+text-shadow: 0 1px 1px #000000;
+text-transform: uppercase;
+margin-left: 220px;
+margin-right: 30px;
+margin-bottom: 50px;
+float: left;
+}
+
+button:hover {
+background: #1e2506;
+cursor: pointer;
+}
+
+button:disabled {
+cursor:wait;
+color: transparent;
+background-color: transparent;
+}
+
+#connecting{
+font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+letter-spacing: 1px;
+padding-top: 3px;
+font-size: 18px;
+}
+
+#connection-error{
+font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+letter-spacing: 1px;
+padding-top: 3px;
+font-size: 18px;
+}
+
+#connection-error-icon{
+margin-top: 14px;
+float: left;
+}
+
+#connection-ok{
+font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+letter-spacing: 1px;
+padding-top: 3px;
+font-size: 18px;
+}
+
+#connection-ok-icon{
+margin-top: 14px;
+float: left;
+}
+
+#uplink_icon{
+margin-left: 360px;
+float: left;
+}
+
+#downlink_icon{
+margin-left: 440px;
+}
+
+form#q4s_options {
+-moz-border-radius: 5px;
+-webkit-border-radius: 5px;
+border-radius: 5px;
+padding: 20px auto;
+margin: 50px auto;
+width: 650px;
+}
+
+:invalid { 
+  border-color: #e88;
+  -webkit-box-shadow: 0 0 5px rgba(255, 0, 0, .8);
+  -moz-box-shadow: 0 0 5px rbba(255, 0, 0, .8);
+  -o-box-shadow: 0 0 5px rbba(255, 0, 0, .8);
+  -ms-box-shadow: 0 0 5px rbba(255, 0, 0, .8);
+  box-shadow:0 0 5px rgba(255, 0, 0, .8);
+}
+
+:required {
+  border-color: #88a;
+  -webkit-box-shadow: 0 0 5px rgba(0, 0, 255, .5);
+  -moz-box-shadow: 0 0 5px rgba(0, 0, 255, .5);
+  -o-box-shadow: 0 0 5px rgba(0, 0, 255, .5);
+  -ms-box-shadow: 0 0 5px rgba(0, 0, 255, .5);
+  box-shadow: 0 0 5px rgba(0, 0, 255, .5);
+}
+
+
+form#q4s_options legend {
+color: #384313;
+font-size: 24px;
+font-weight: bold;
+padding-bottom: 0px;
+text-shadow: 0 1px 1px #c0d576;
+}
+
+form#q4s_options fieldset {
+margin-bottom: 30px;
+}
+
+form#q4s_options ol li {
+border: none;
+-moz-border-radius: 5px;
+-webkit-border-radius: 5px;
+border-radius: 5px;
+line-height: 20px;
+list-style: none;
+padding: 5px 10px;
+margin-bottom: 2px;
+}
+
+
+form#q4s_options label {
+margin-top: 6px;
+float: left;
+font-size: 18px;
+width: 330px;
+}
+
+form#q4s_options label[for=updown] {
+margin-left: 360px;
+width: 150px;
+}
+
+form#q4s_options label[for=tcpudp] {
+margin-left: 370px;
+width: 100px;
+}
+
+input {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  border:1px solid #ccc;
+  font-size:16px;
+  width:160px;
+  min-height:30px;
+  display:block;
+  margin-bottom:15px;
+  margin-top:5px;
+  outline: none;
+  padding:0px 0px 0px 10px;
+
+  -webkit-border-radius:5px;
+  -moz-border-radius:5px;
+  -o-border-radius:5px;
+  -ms-border-radius:5px;
+  border-radius:5px;
+}
+
+form#q4s_options input[for=halfsize] {
+  width:80px;
+  float: left;
+}
+
+input[type=submit] {
+  background:none;
+  padding:10px;
+}
+
+
+

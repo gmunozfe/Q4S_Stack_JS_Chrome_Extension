@@ -1,23 +1,28 @@
-{
-   "name": "Q4S Client Stack",
-   "version": "0.1",
-   "manifest_version": 2,
-   "background": {
-    "page": "background.html"
-  },
-   "browser_action": {
-      "default_icon": "ico16.png",
-      "default_title": "Q4S Client Stack",
-      "default_popup": "popup.html"
-   },
-   "description": "Q4S Client Stack",
-   "icons": {
-      "ico128": "ico128.png",
-      "ico16": "ico16.png",
-      "icon_logo": "icon_logo.png"
-   },
-   "permissions": ["experimental",
-                   "notifications",
-                   "background"]
-                   
-}
+    {
+       "name": "SmartStream Q4S Client",
+       "version": "0.1",
+       "manifest_version": 2,
+       "app": {
+         "background": {
+           "scripts":["main.js"]
+          }
+        },
+       "description": "Q4S Client Stack",
+       "minimum_chrome_version": "23",
+       "icons": {
+          "128": "icon_128.png",
+          "16": "icon_16.png"
+       },
+       "permissions": [{"socket": [
+                           "udp-send-to",
+                           "udp-bind",
+                           "tcp-connect",
+                           "tcp-listen"
+                         ]},
+                       "notifications",
+                       "background"
+                       ]                 
+    }
+
+
+

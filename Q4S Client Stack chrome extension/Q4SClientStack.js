@@ -1,9 +1,8 @@
   // Nofication display time in ms.
 	var NOTIFICATION_DISPLAY_TIME = 15000;
-	var SERVER_ADDRESS = localStorage.serverAddress;//'localhost';
-	console.log("SERVER_ADDRESS:"+SERVER_ADDRESS);
-	var SERVER_TCP_PORT = localStorage.serverTCPPort;//'8000';
-	var SERVER_UDP_PORT = parseInt(localStorage.serverUDPPort);//62516;
+	var SERVER_ADDRESS; 
+	var SERVER_TCP_PORT;
+	var SERVER_UDP_PORT;
 	
 	var socketId; //For the UDP connection
   var sid;
@@ -14,8 +13,11 @@
 	var BEGIN_HEADER0 = 'BEGIN q4s://';
 	var BEGIN_HEADER1 = ' Q4S/1.0\n';
 	var PING_HEADER0 = 'PING /stage0 Q4S/1.0';
+	var PING_HEADER2 = 'PING /stage2 Q4S/1.0';
+	var PING_ = 'PING';
 	var BWIDTH_HEADER = 'BWIDTH /stage1 Q4S/1.0';
 	var OK_HEADER = 'Q4S/1.0 200 OK';
+  var CANCEL_HEADER = 'CANCEL q4s://';
   var SESSION_ID_HEADER = 'Session-Id';
   var SEQUENCE_NUMBER_HEADER = 'Sequence-Number';
   var MEASUREMENTS_HEADER = 'Measurements';
@@ -23,44 +25,35 @@
   var CONTENT_LENGTH_HEADER = 'Content-Length';
   var CONTENT_TYPE_HEADER = 'Content-Type: application/sdp';
     
-  var BWIDTH_CONSTRAINT = parseInt(localStorage.appBwConstraintClient); //1000 kbps
+  var BWIDTH_CONSTRAINT; // = 1000;/*parseInt(localStorage.appBwConstraintClient); 1000 kbps;*/
+ 
     
   var SDP_0 = 'v=0'+LINE_SEPARATOR+'o=q4s-UA '+navigator.userAgent+LINE_SEPARATOR+'s=Q4S'+LINE_SEPARATOR+'i=Q4S parameters'+LINE_SEPARATOR;
-  var SDP_APP_ALERT_PAUSE = 'a=app-alert-pause:'+parseInt(localStorage.appAlertPause)+LINE_SEPARATOR;
-  var SDP_APP_CONSTRAINTS = 'a=application:latency:'+parseInt(localStorage.appLatencyConstraint)+LINE_SEPARATOR+
-                            'a=applicacion:jitter:'+parseInt(localStorage.appJitterConstraintClient)+'/'+parseInt(localStorage.appJitterConstraintServer)+LINE_SEPARATOR+
-                            'a=applicacion:bandwidth:'+parseInt(localStorage.appBwConstraintClient)+'/'+parseInt(localStorage.appBwConstraintServer)+LINE_SEPARATOR+
-                            'a=applicacion:packetloss:'+parseFloat(localStorage.appPacketLossConstraintClient)+'/'+parseFloat(localStorage.appPacketLossConstraintServer)+LINE_SEPARATOR;
-  var SDP_PROCEDURE_DEFAULT = 'a=measurement:procedure default('+parseInt(localStorage.negPingIntervalClient)+'/'+parseInt(localStorage.negPingIntervalServer)+','
-                                                                +parseInt(localStorage.contPingIntervalClient)+'/'+parseInt(localStorage.contPingIntervalServer)+','
-                                                                +parseInt(localStorage.bwTime)+','
-                                                                +parseInt(localStorage.pingWindowClient)+'/'+parseInt(localStorage.pingWindowServer)+','
-                                                                +parseInt(localStorage.packetlossWindowServer)+'/'+parseInt(localStorage.packetlossWindowServer)+')';
   
-  var N_OF_PINGS_NEGOTIATION_CLIENT = parseInt(localStorage.pingWindowClient)-1; //255 //number of pings //begins at 0
-  var PING_INTERVAL_NEGOTIATION_CLIENT = parseInt(localStorage.negPingIntervalClient)-1;//49;//50; //ms including proccesing time: 50-1
+  var APP_ALERT_PAUSE;
+  var SDP_APP_ALERT_PAUSE;
+  var SDP_APP_CONSTRAINTS;
+  var SDP_PROCEDURE_DEFAULT;
+  var N_OF_PINGS_NEGOTIATION_CLIENT; //number of pings //begins at 0
+  var N_OF_PINGS_CONTINUITY_CLIENT;
+  var PING_INTERVAL_NEGOTIATION_CLIENT;//50; //ms including proccesing time: 50-1
+  var PING_INTERVAL_CONTINUITY_CLIENT;
   
-  var BWIDTH_MESSAGE_LENGTH = 4096;
+  var BWIDTH_MESSAGE_LENGTH = 4096;//4096;
+  var BWIDTH_MESSAGE_LENGTH_SERVER = 4096;//4096;
   
   var seq_number_bw_sent = -1;
   var counterSentPackets =  0;
-  var bwf = BWIDTH_CONSTRAINT/32;  //KBps i.e., packets per seconds (/8 if packets are 1 KB, /32 if packets are 4 KB length)
-	var packetsPerMs = bwf/1000;
+  var bwf; // = BWIDTH_CONSTRAINT/32;  //KBps i.e., packets per seconds (/8 if packets are 1 KB, /32 if packets are 4 KB length)
+	var packetsPerMs; // = bwf/1000;
 	var BWIDTH_INTERVAL_TIMER;
-	if (BWIDTH_CONSTRAINT <= 1000)
-	  BWIDTH_INTERVAL_TIMER = 150;//Math.ceil(1/packetsPerMs); //ms
-	else if (BWIDTH_CONSTRAINT < 3000)
-		BWIDTH_INTERVAL_TIMER = 30; //Math.ceil(192*packetsPerMs); //ms //48
-  else if (BWIDTH_CONSTRAINT < 5000)
-  	BWIDTH_INTERVAL_TIMER = 20; //Math.ceil(386*packetsPerMs); //ms //24
-  else
-  	BWIDTH_INTERVAL_TIMER = 17;
+	
   
 	var wakeUpTime;
 	var numOfPackets;
 	var uplinkBW;
 	var downlinkBW;
-	var BWIDTH_WINDOW = 5000;
+	var BWIDTH_WINDOW; //= 5000;
 	
   
   
@@ -86,43 +79,187 @@
 	var bwMsgReceived = [];
 	var bwMsgCounter;
 	
-	var socket = io.connect('http://'+SERVER_ADDRESS+':'+SERVER_TCP_PORT);
-	//var notification = webkitNotifications.createHTMLNotification(/*'icon_logo.png',*/"notification.html");
-	
-	var sdp = SDP_0+SDP_APP_ALERT_PAUSE+SDP_APP_CONSTRAINTS+SDP_PROCEDURE_DEFAULT;
-	var contentLengthBegin = CONTENT_LENGTH_HEADER+": "+sdp.length;
-  var beginMsg = BEGIN_HEADER0+SERVER_ADDRESS+BEGIN_HEADER1+"\n"+CONTENT_TYPE_HEADER+"\n"+contentLengthBegin+"\n"+sdp;
-  socket.emit('begin', beginMsg);
   
-  socket.on('200 OK BEGIN', function (sessionId) {
-  	//showEvent("Handshake", "OK");
-    if (sessionId !== null)
-    {
-    	socket.emit('ready', 0 /*stage*/, sessionId);
-    }
-   }); 
-   
-  socket.on('200 OK READY', function (stage, sessionId) {
-    showEvent("Negotiation Stage 0", "Begin");
-    if (sessionId !== null)
-    {
-      sid = sessionId;
-      //remove listeners of this socket
-      socket.removeAllListeners('200 OK READY');
-      chrome.experimental.socket.create('udp', {}, onCreate);
-    }
-  });
+  var socket;
+	var socketUdp = chrome.socket; // || chrome.experimental.socket;
+  console.log("socket:"+socketUdp);
+  
+  var sdp;
+      
+	var mySession;
+	
+	var notifications = [];
+	
+	var div_error;
+  var div_conn;
+  var div_ok;
+  
+  
+window.addEventListener("load", function() {
+	
+	document.body.classList.add('signed-out');
+  
+  
+  var start = document.getElementById("begin_q4s");
+  var stop = document.getElementById("cancel_q4s");
 
+
+  start.onclick = function(ev) {
+  	document.getElementById("begin_q4s").disabled=true;
+  	
+  	div_error = document.getElementById('connection-error');
+    div_error.style.display = 'none';
+    
+    div_ok = document.getElementById('connection-ok');
+    div_ok.style.display = 'none';
+    
+    div_conn = document.getElementById('connecting');
+    div_conn.style.display = '';
+  	
+  	SERVER_ADDRESS = (document.getElementById("server-address")).value;
+  	SERVER_TCP_PORT = parseInt((document.getElementById("server-tcp-port")).value);
+  	SERVER_UDP_PORT = parseInt((document.getElementById("server-udp-port")).value);
+  	
+  	APP_ALERT_PAUSE = parseInt((document.getElementById("app-alert-pause")).value);
+  	
+  	SDP_APP_ALERT_PAUSE = 'a=app-alert-pause:'+APP_ALERT_PAUSE+LINE_SEPARATOR;
+  	
+  	SDP_APP_CONSTRAINTS = 'a=application:latency:'+(document.getElementById("app-latency")).value+LINE_SEPARATOR+
+                            'a=applicacion:jitter:'+(document.getElementById("app-jitter-uplink")).value+'/'+(document.getElementById("app-jitter-downlink")).value+LINE_SEPARATOR+
+                            'a=applicacion:bandwidth:'+(document.getElementById("app-bw-uplink")).value+'/'+(document.getElementById("app-bw-downlink")).value+LINE_SEPARATOR+
+                            'a=applicacion:packetloss:'+(document.getElementById("app-pl-uplink")).value+'/'+(document.getElementById("app-pl-downlink")).value+LINE_SEPARATOR;
+  	
+  	SDP_PROCEDURE_DEFAULT = 'a=measurement:procedure default('+(document.getElementById("neg-ping-interval-uplink")).value+'/'+(document.getElementById("neg-ping-interval-downlink")).value+','
+                                                                +(document.getElementById("cont-ping-interval-uplink")).value+'/'+(document.getElementById("cont-ping-interval-downlink")).value+','
+                                                                +(document.getElementById("bw-time")).value+','
+                                                                +(document.getElementById("latency-window-size-uplink")).value+'/'+(document.getElementById("latency-window-size-downlink")).value+','
+                                                                +(document.getElementById("packetloss-window-size-uplink")).value+'/'+(document.getElementById("packetloss-window-size-downlink")).value+')';
+    
+    BWIDTH_CONSTRAINT = parseInt((document.getElementById("app-bw-uplink")).value);
+    
+    bwf = BWIDTH_CONSTRAINT*1024/(8*BWIDTH_MESSAGE_LENGTH);  //KBps i.e., packets per seconds (/8 if packets are 1 KB, /32 if packets are 4 KB length)
+    
+	  packetsPerMs = bwf/1000;
+	
+    
+    if (BWIDTH_CONSTRAINT <= 1000)
+	  BWIDTH_INTERVAL_TIMER = 150;//Math.ceil(1/packetsPerMs); //ms
+	else if (BWIDTH_CONSTRAINT < 3000)
+		BWIDTH_INTERVAL_TIMER = 30; //Math.ceil(192*packetsPerMs); //ms //48
+  else if (BWIDTH_CONSTRAINT < 5000)
+  	BWIDTH_INTERVAL_TIMER = 20; //Math.ceil(386*packetsPerMs); //ms //24
+  else
+  	BWIDTH_INTERVAL_TIMER = 17;
+                                                                
+  	N_OF_PINGS_NEGOTIATION_CLIENT = parseInt((document.getElementById("latency-window-size-uplink")).value)-1; //255 //number of pings //begins at 0
+  	N_OF_PINGS_CONTINUITY_CLIENT = parseInt((document.getElementById("packetloss-window-size-uplink")).value)-1; //1000 //number of pings //begins at 0
+  	PING_INTERVAL_NEGOTIATION_CLIENT = parseInt((document.getElementById("neg-ping-interval-uplink")).value)-1;//49;//50; //ms including proccesing time: 50-1*/
+    PING_INTERVAL_CONTINUITY_CLIENT = parseInt((document.getElementById("cont-ping-interval-uplink")).value)-1;//49;//50; //ms including proccesing time: 50-1*/
+    
+    BWIDTH_WINDOW = parseInt((document.getElementById("bw-time")).value);
+    
+    
+  	
+  	console.log("SERVER_ADDRESS:"+SERVER_ADDRESS);
+	  console.log("SDP_APP_ALERT_PAUSE:"+SDP_APP_ALERT_PAUSE);
+	  console.log("SDP_APP_CONSTRAINTS:"+SDP_APP_CONSTRAINTS);
+	  console.log("SDP_PROCEDURE_DEFAULT:"+SDP_PROCEDURE_DEFAULT);
+	  console.log("N_OF_PINGS_NEGOTIATION_CLIENT:"+N_OF_PINGS_NEGOTIATION_CLIENT);
+	  console.log("PING_INTERVAL_NEGOTIATION_CLIENT:"+PING_INTERVAL_NEGOTIATION_CLIENT);
+	  console.log("N_OF_PINGS_CONTINUITY_CLIENT:"+N_OF_PINGS_CONTINUITY_CLIENT);
+	  
+	  var opts  = {};
+    opts['sync disconnect on unload'] = false;
+		
+		socket = io.connect('http://'+SERVER_ADDRESS+':'+SERVER_TCP_PORT, opts);
+		   
+    socket.on('error', function(e){
+    	socket = null;
+    	div_conn.style.display = 'none';
+    	div_error.style.display = '';
+    	console.log("connection error !!");
+    	document.getElementById("begin_q4s").disabled=false;
+    });
+    
+    
+	  console.log("Socket got:"+socket);
+	  
+
+    beginQ4SSession();
+	}
+
+	stop.onclick = function(ev) {
+		sdp = SDP_0+SDP_APP_ALERT_PAUSE+SDP_APP_CONSTRAINTS+SDP_PROCEDURE_DEFAULT;
+    var contentLengthCancel = CONTENT_LENGTH_HEADER+": "+sdp.length;
+    var cancelMsg = CANCEL_HEADER+SERVER_ADDRESS+BEGIN_HEADER1+"\n"+CONTENT_TYPE_HEADER+"\n"+contentLengthCancel+"\n"+sdp;
+    
+    socket.emit('cancel', cancelMsg, mySession);
+    
+        
+    for (notific in notifications){
+    	console.log("notific:"+notific);
+    	notifications[notific].cancel();
+    }
+    
+		window.close();
+	}
+});
+  
+
+  
+  function beginQ4SSession(){
+    sdp = SDP_0+SDP_APP_ALERT_PAUSE+SDP_APP_CONSTRAINTS+SDP_PROCEDURE_DEFAULT;
+    var contentLengthBegin = CONTENT_LENGTH_HEADER+": "+sdp.length;
+    var beginMsg = BEGIN_HEADER0+SERVER_ADDRESS+BEGIN_HEADER1+"\n"+CONTENT_TYPE_HEADER+"\n"+contentLengthBegin+"\n"+sdp;
+    
+    
+    socket.emit('begin', beginMsg);
+    
+    
+    socket.on('200 OK BEGIN', function (sessionId) {
+      	//showEvent("Handshake", "OK");
+      	if (sessionId !== null)
+      	{
+      		mySession = sessionId;
+      		socket.emit('ready', 0 , sessionId); //Stage 0
+      	}
+     }); 
+     
+    socket.on('200 OK READY', function (stage, sessionId) {
+      showEvent("Negotiation Stage 0", "Begin");
+      if (sessionId !== null)
+      {
+        sid = sessionId;
+        //remove listeners of this socket
+        socket.removeAllListeners('200 OK READY');
+        socketUdp.create('udp', {}, onCreate);
+      }
+    });
+  }
+    
   function negotiation_Stage1(sessionId){
-  	socket.emit('ready', 1 /*stage*/, sessionId);
+  	socket.emit('ready', 1 , sessionId); //Stage 1
   	socket.on('200 OK READY', function (stage, sessionId) {
+  		//remove listeners of this socket
+      socket.removeAllListeners('200 OK READY');
+        
   		//showEvent("Negotiation Stage 1", "Begin");
   		bwMsgCounter = 0;
   		bwOriginTime = new Date().getTime();
   		bwBeginningTime = bwOriginTime;
       
-      packets2SendPerInterval = Math.ceil(BWIDTH_INTERVAL_TIMER*packetsPerMs*1.01);
+      //packets2SendPerInterval = Math.ceil(BWIDTH_INTERVAL_TIMER*packetsPerMs*1.01);
+      //***new
+      packets2SendPerInterval = 1;
+      BWIDTH_INTERVAL_TIMER = Math.ceil(0.9*packets2SendPerInterval/packetsPerMs);
+      if (BWIDTH_INTERVAL_TIMER < 20){
+      	packets2SendPerInterval = 2;
+      BWIDTH_INTERVAL_TIMER = Math.ceil(0.9*packets2SendPerInterval/packetsPerMs);
+      
+      }
+
 	    numOfPackets = Math.ceil(BWIDTH_WINDOW * packets2SendPerInterval / BWIDTH_INTERVAL_TIMER);
+			console.log("****  numOfPackets: "+numOfPackets+" packets2SendPerInterval:"+packets2SendPerInterval+" BWIDTH_INTERVAL_TIMER:"+BWIDTH_INTERVAL_TIMER);
 	
   		setTimeout(function(){
              //periodic launch of bwidth
@@ -135,12 +272,15 @@
   function showEvent(title, ev){
 		
     //notification.show();
-    var icon  = 'http://'+SERVER_ADDRESS+':80/images/icon_logo.png';
-    var notification = webkitNotifications.createNotification(icon, title, ev);
+    //var icon  = 'http://'+SERVER_ADDRESS+':80/images/icon_logo.png';
+    var notification = webkitNotifications.createNotification(/*icon*/'icon_16.png', title, ev);
     notification.show();
+    notifications.push(notification);
 		
 		// Hide the notification after the configured duration.
-		setTimeout(function(){ notification.cancel(); }, NOTIFICATION_DISPLAY_TIME);	
+		setTimeout(function(){ 
+			notification.cancel(); 
+			notifications.pop(notification);}, NOTIFICATION_DISPLAY_TIME);	
   }
   
   
@@ -184,7 +324,7 @@ for ( i = 0; i < len; ++i ) {
 
 function onCreate(socketInfo) {
   socketId = socketInfo.socketId;
-  chrome.experimental.socket.connect(
+  socketUdp.connect(
                         socketInfo.socketId, SERVER_ADDRESS, SERVER_UDP_PORT,
                         onConnect)
 }
@@ -221,7 +361,7 @@ function onConnect(result) {
                                 
                                 var ab = str2ab(PING_HEADER0+"\n"+SESSION_ID_HEADER+": "+sid+"\n"+SEQUENCE_NUMBER_HEADER+": "+seq_number_pings_sent+"\n"+measurements+"\n"+TIMESTAMP_HEADER+": "+intervalTime+"\n"+CONTENT_LENGTH_HEADER+": 0");
                                 var str2abTime = new Date().getTime();
-                                chrome.experimental.socket.write(socketId, ab, 
+                                socketUdp.write(socketId, ab, 
                                                               function(writeInfo){ 
                                                               		var currentTime = new Date().getTime();
                                                               		sentTimePing[seq_number_pings_sent]=currentTime;
@@ -244,7 +384,7 @@ function onConnect(result) {
 
 
 function receivingData(socketId){
-chrome.experimental.socket.recvFrom(socketId, function(readInfo){
+socketUdp.recvFrom(socketId, function(readInfo){
 	if (readInfo.port === 0)
 		return;
       var currTime = new Date().getTime();
@@ -291,9 +431,12 @@ chrome.experimental.socket.recvFrom(socketId, function(readInfo){
        if (uplink_jitter)
         	uplink_jitter.trim();
         	
-       uplink_packet_loss = (measParsed[' pl'])
-       if (uplink_packet_loss)
-        	uplink_packet_loss.trim();
+       var temp_uplink_packet_loss = (measParsed[' pl'])
+       if (temp_uplink_packet_loss)
+       {
+          uplink_packet_loss = temp_uplink_packet_loss;
+          uplink_packet_loss.trim();
+       }
        
        uplinkBW = (measParsed[' bw'])
        if (uplinkBW)
@@ -306,7 +449,7 @@ chrome.experimental.socket.recvFrom(socketId, function(readInfo){
       var time1 = new Date().getTime()
       
          
-      if (newString.indexOf(PING_HEADER0) != -1) { //PING stage 0 has been received
+      if (newString.indexOf(PING_) != -1) { //PING stage 0,2 has been received
         //console.log("<-- PING received ["+currTime+"]:"+newString);
         //console.log("<-- PING parsing time ["+time1+"]");
     
@@ -314,7 +457,7 @@ chrome.experimental.socket.recvFrom(socketId, function(readInfo){
              var ab2 = str2ab(OK_HEADER+"\n"+SESSION_ID_HEADER+": "+sid2+"\n"+SEQUENCE_NUMBER_HEADER+": "+sn2+"\n"+CONTENT_LENGTH_HEADER+": 0");
              var time2 = new Date().getTime()
                 
-                chrome.experimental.socket.write(socketId, ab2, 
+                socketUdp.write(socketId, ab2, 
                                              function(writeInfo){ 
                                               var sentTime = new Date().getTime();
                                               //console.log("200 OK sent time:"+sentTime);
@@ -325,7 +468,11 @@ chrome.experimental.socket.recvFrom(socketId, function(readInfo){
                                                   pingElapsed.push(Math.abs(receivedPingTime[sn2]-receivedPingTime[sn2-1]-(pingIntervalServer[sn2]-pingIntervalServer[sn2-1])));
                                                   downlink_jitter = Math.round(utilsClientQ4S.mean(pingElapsed)*100)/100; //mean of the elapsed time between pings reception
                                                   latency = Math.round(utilsClientQ4S.median(rtt)/2);
-                                                  seq_received_pings.push(sn2); //store sequence number for calculating packet loss
+                                                  if (seq_received_pings.length >= N_OF_PINGS_CONTINUITY_CLIENT){
+                                                      seq_received_pings.shift(); //Remove the first item
+                                                  }
+                                                  var seq2store = sn2++;
+                                                  seq_received_pings.push(seq2store); //store sequence number for calculating packet loss
                                                   
                                                   //console.log("--> 200 OK ["+sn2+"]: receivedPingTime:"+receivedPingTime[sn2]+" - "+receivedPingTime[sn2-1]+"; pingIntervalServer:"+pingIntervalServer[sn2]+" - "+pingIntervalServer[sn2-1]);
              
@@ -346,7 +493,7 @@ chrome.experimental.socket.recvFrom(socketId, function(readInfo){
       else if (newString.indexOf(BWIDTH_HEADER) != -1) { //BWIDTH has been received
         bwMsgReceived[sn2]=currTime;
         bwMsgCounter++;
-        downlinkBW = Math.round(8*4000*bwMsgCounter*100/(bwMsgReceived[sn2]-bwMsgReceived[0]))/100;
+        downlinkBW = Math.round(8*BWIDTH_MESSAGE_LENGTH_SERVER*bwMsgCounter*100/(bwMsgReceived[sn2]-bwMsgReceived[0]))/100;
         var expectedReceivedPackets = parseInt(sn2)+1;
         downlink_packet_loss = Math.round((10000*(expectedReceivedPackets-bwMsgCounter))/expectedReceivedPackets)/100;
         console.log("<-- BW Message received ["+currTime+"]: "+sn2+";  "+downlink_packet_loss);
@@ -388,7 +535,7 @@ function sendBWidthMessages(packets2Send){
                                        
   var ab_bw = str2ab_1024length(bwMessage);
                                        
-  chrome.experimental.socket.write(socketId, ab_bw, 
+  socketUdp.write(socketId, ab_bw, 
                                  function(writeInfo){ 
                                  	if (counterSentPackets === packets2Send){ 
                                     	 //sleep;
@@ -398,15 +545,20 @@ function sendBWidthMessages(packets2Send){
                                        	  timeo = 0;}
                                        //console.log("Time after sending "+counterSentPackets+" packets:"+(currentTime-wakeUpTime)+" timeo:"+timeo);
                                        
-                                       bwOriginTime = currentTime//new Date().getTime();
+                                       bwOriginTime = currentTime;//new Date().getTime();
                                        if (seq_number_bw_sent < numOfPackets){
-                                         setTimeout(function(){
+                                           setTimeout(function(){
                                        	   ready2SendBWidthMessages();
                                        	   }, timeo);
+                                       	   
                                        } else{
                                        	 console.log("Total time per "+(seq_number_bw_sent+1)+" BW messages:"+(currentTime-bwBeginningTime));
                                          setTimeout(function(){
                                            showEvent("Negotiation Stage 1 finished", 'BandWith:'+uplinkBW+'/'+downlinkBW+' (kbps)  PacketLoss: '+uplink_packet_loss+'/'+downlink_packet_loss+' (%)');
+                                           //begin continuity stage
+                                           //reset array with received pings
+                                           seq_received_pings = [];
+                                           continuity_Stage(sid);
                                          }, 2000);
                                        }
                                     }
@@ -421,4 +573,63 @@ function sendBWidthMessages(packets2Send){
             
          
 
+}
+
+
+function continuity_Stage(sid){
+	div_conn.style.display = 'none';
+	div_ok.style.display = '';
+	document.body.classList.remove('signed-out');
+	document.body.classList.add('signed-in');
+	
+	socket.emit('ready', 2, sid); //Continuity Stage
+	socket.on('200 OK READY', function (stage, sessionId) {
+  	showEvent("Continuity Stage", "Begin continuous quality measurements");
+  	continuity_Pinging(sid);
+  	setInterval(function(){
+                           showEvent("Quality measurements", 'Latency: '+latency+' ms; Jitter: '+uplink_jitter+'/'+downlink_jitter+' PacketLoss: '+uplink_packet_loss+'/'+downlink_packet_loss+' (%)');
+                         }, APP_ALERT_PAUSE);
+  });
+}
+
+function continuity_Pinging(sid){
+	var seq_number_pings_sent = -1;
+                          var lastInterval;
+                          var last_ping_received;
+                          var ping_interval = 
+                            setInterval(function() { //periodic launch of pings
+                            	var intervalTime = new Date().getTime();
+                                                              		
+                             seq_number_pings_sent++;
+                             if (seq_number_pings_sent > N_OF_PINGS_CONTINUITY_CLIENT){
+                                //reset sequence number
+                                  seq_number_pings_sent = 0;
+                             }
+                             var measurements = MEASUREMENTS_HEADER+": l="+latency+", j="+downlink_jitter
+                             
+                             if (seq_received_pings.length > 0){
+                                last_ping_received = seq_received_pings[seq_received_pings.length-1];
+                                
+                                if (last_ping_received === N_OF_PINGS_CONTINUITY_CLIENT){
+                                	//last_ping_received++; //sequence begins at 0, but not added because it has not been pushed into the stack yet
+                                  downlink_packet_loss = 100 - (100*seq_received_pings.length/last_ping_received);
+                                  measurements +=", pl="+downlink_packet_loss;
+                                  //reset array with received pings
+                                  seq_received_pings = [];  
+                                }
+                              }
+                              
+                              var ab = str2ab(PING_HEADER2+"\n"+SESSION_ID_HEADER+": "+sid+"\n"+SEQUENCE_NUMBER_HEADER+": "+seq_number_pings_sent+"\n"+measurements+"\n"+TIMESTAMP_HEADER+": "+intervalTime+"\n"+CONTENT_LENGTH_HEADER+": 0");
+                              var str2abTime = new Date().getTime();
+                              socketUdp.write(socketId, ab, 
+                                                            function(writeInfo){ 
+                                                            		var currentTime = new Date().getTime();
+                                                            		sentTimePing[seq_number_pings_sent]=currentTime;
+                                                            		lastInterval= intervalTime;
+                                                            		});
+                                
+                                
+                             
+                            }, PING_INTERVAL_CONTINUITY_CLIENT);
+                            
 }

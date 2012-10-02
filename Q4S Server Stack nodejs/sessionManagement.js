@@ -24,6 +24,8 @@ var sessionManagement = {
     sessionId.seq_received_pings = [];
     sessionId.bwMsgReceived = [];
     sessionId.bwMsgCounter = 0;
+    sessionId.intervalContinuity = 0;
+    sessionId.nPingsContinuityServer = 0;
     sessions.push(sessionId);
     count++;
   },
@@ -50,12 +52,14 @@ var sessionManagement = {
         return null;
     }
   },
-  beginNegotiation: function(sessionId) {
+  beginNegotiation: function(sessionId, addr, udp_p) {
   	console.log("session "+sessionId+" BEGIN negotiation");
   	var session = this.getSessionById(sessionId);
     if(session != null) {
     	  console.log("session "+sessionId+" hasBegun 1");
         session.hasBegun = 1;
+        session.address = addr;
+        session.udp_port = udp_p;
     } else {
         console.log("session "+sessionId+" NULL");
     }   
@@ -68,11 +72,62 @@ var sessionManagement = {
         return null;
     }
   },
+  getAddress: function(sessionId) {
+  	var session = this.getSessionById(sessionId);
+    if(session != null) {
+        return session.address;
+    } else {
+        return null;
+    }
+  },
+  getUdpPort: function(sessionId) {
+  	var session = this.getSessionById(sessionId);
+    if(session != null) {
+        return session.udp_port;
+    } else {
+        return null;
+    }
+  },
+  storeContinuityInterval: function(sessionId, interval) {
+  	var session = this.getSessionById(sessionId);
+    if(session != null) {
+    	  session.intervalContinuity = interval;
+    } else {
+        console.log("session "+sessionId+" NULL");
+    }   
+  },
+  getContinuityInterval: function(sessionId) {
+  	var session = this.getSessionById(sessionId);
+    if(session != null) {
+        return session.intervalContinuity;
+    } else {
+        return null;
+    }
+  },
+  setNofPingsContinuity: function(sessionId, numberOfPings) {
+  	var session = this.getSessionById(sessionId);
+    if(session != null) {
+    	  session.nPingsContinuityServer = numberOfPings;
+    } else {
+        console.log("session "+sessionId+" NULL");
+    }   
+  },
+  getNofPingsContinuity: function(sessionId) {
+  	var session = this.getSessionById(sessionId);
+    if(session != null) {
+        return session.nPingsContinuityServer;
+    } else {
+        return null;
+    }
+  },
   pingReceivedTime: function(sessionId, seqNumber, timeReceived, timestamp) {
   	var session = this.getSessionById(sessionId);
     if(session != null) {
         session.pingReceived[seqNumber] = timeReceived;
         session.pingTimestamp[seqNumber] = timestamp;
+        if (session.seq_received_pings.length >= this.getNofPingsContinuity(sessionId)){
+          session.seq_received_pings.shift(); //Remove the first item
+        }
         session.seq_received_pings.push(seqNumber);
         if (seqNumber>0){
         	session.pingElapsed.push(Math.abs(session.pingReceived[seqNumber]-session.pingReceived[seqNumber-1]-(session.pingTimestamp[seqNumber]-session.pingTimestamp[seqNumber-1])));
@@ -131,13 +186,25 @@ var sessionManagement = {
     }
     
   },
-  calculateUplinkPacketLossPing: function(sessionId) {
+  getLastPingReceived: function(sessionId) {
     var session = this.getSessionById(sessionId);
     if(session != null) {
         var last_ping_received = session.seq_received_pings[session.seq_received_pings.length-1]; 
-        last_ping_received++; //sequence begins at 0
-        if (last_ping_received >= 0)
-        	session.packetloss = 100 - (100*session.seq_received_pings.length/last_ping_received); 
+        last_ping_received++;//sequence begins at 0
+        return  last_ping_received;
+    } else {
+        console.log("session "+sessionId+" NULL");
+    }
+  },
+  calculateUplinkPacketLossPing: function(sessionId) {
+    var session = this.getSessionById(sessionId);
+    if(session != null) {
+        var last_ping_received = this.getLastPingReceived(sessionId);
+        if (last_ping_received >= 0){
+        	console.log("session.seq_received_pings.length: "+session.seq_received_pings.length);
+        	console.log("last_ping_received: "+last_ping_received);
+        	session.packetloss = 100 - (100*session.seq_received_pings.length/last_ping_received);
+        }
     } else {
         console.log("session "+sessionId+" NULL");
     }

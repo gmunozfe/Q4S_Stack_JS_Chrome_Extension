@@ -1,0 +1,139 @@
+<html>
+  <head>
+  	<meta charset="utf-8" />
+  	<link rel="stylesheet" href="q4s_window.css">
+    <title>Q4S Client Stack</title>
+    <script src="socket.io.js"></script>
+    <script src="utilsClientQ4S.js"></script>
+    <script src="Q4SClientStack.js"></script>
+    <style>
+    	.signed-in #signed-in,
+      .signed-out #signed-out {
+      opacity: 1;
+      }
+      .signed-in #signed-out,
+      .signed-out #signed-in {
+      display: none;
+      }
+    </style>     
+  </head>
+  <body>
+  	<div id="q4s_logo">
+      <img src="icon_128_transp.png" width="128" height="71" alt=" Smart Stream logo" />
+    </div>
+    <div id="q4s_motto">
+    	<p>Q4S protocol: the real-time multiplayer games enabler</p>
+    </div>  
+    <div id="buttons_start_stop">  
+      <div id="signed-out" class="container">
+       <button id="begin_q4s">Begin Q4S session</button>
+      </div>
+      <div id="signed-in" class="container">
+       <button id="cancel_q4s">Cancel Q4S session</button>
+      </div>
+    </div>
+    <div id="connection-error" style="display:none">
+    	 <div id="connection-error-icon">	
+       	<img src="exclamation_red.png" width="32" height="32" alt=" Error logo" />
+       </div>
+       <div id="connection-error-text">	
+       	<p>Connection Error</p>
+       </div>
+    </div>
+    <div id="connection-ok" style="display:none">
+    	 <div id="connection-ok-icon">	
+       	<img src="check_green.png" width="32" height="32" alt=" OK logo" />
+       </div>
+       <div id="connection-ok-text">	
+       	<p>Connected</p>
+       </div>
+    </div>
+    <div id="connecting" style="display:none">
+    	 <p>Connecting...</p>
+    </div>  
+      
+      
+    
+      <form id=q4s_options>
+      	<fieldset>
+      		<legend>Q4S Server</legend>
+      			<ol>
+      				<li>
+      					<label>Server host:</label>
+      					<input type="text" id="server-address" value="q4s.dit.upm.es" required/>
+      				</li>
+      				<label for=tcpudp>TCP / UDP</label>
+      				<li>
+      					<label>Server listening ports:</label> 
+      					<input for=halfsize type="number" id="server-tcp-port" step="1" min="1024" max="65535" value="8001" required/>
+      					<input for=halfsize type="number" id="server-udp-port" step="1" min="1024" max="65535" value="62516" required/>
+      				</li>
+      			</ol>
+      	</fieldset>
+      	<fieldset>   
+      		<legend>Application constraints</legend>
+      			<ol>
+      				<li>	
+      					<label>Application Latency: (ms)</label>
+      					<input type="number" id="app-latency" step="5" min="0" max="1000" value="50" required/>
+      				</li>
+      				<div id="uplink_icon">
+      					<img src="up_red.png" width="32" height="32" alt=" Uplink" />
+      				</div>
+      				<div id="downlink_icon">
+      					<img src="down_red.png" width="32" height="32" alt=" Downlink" />
+      				</div>	
+      				<li>		
+      					<label>Application Jitter:</label>
+     						<input for=halfsize type="number" id="app-jitter-uplink" step="1" min="0" max="1000" value="15" required/><input for=halfsize type="number" id="app-jitter-downlink" step="1" min="0" max="1000" value="8" required/>
+      				</li>	
+      				<li>	
+      					<label>Application Bandwith: (kbps)</label>
+      					<input for=halfsize type="number" id="app-bw-uplink" step="50" min="0" max="1000" value="100" required/><input for=halfsize type="number" id="app-bw-downlink" step="50" min="0" max="3000" value="100" required/>
+      				</li>	
+      				<li>
+      					<label>Application PacketLoss: (%)</label>
+      					<input for=halfsize type="number" id="app-pl-uplink" step="0.1" min="0" max="100" value="0.3" required/><input for=halfsize type="number" id="app-pl-downlink" step="0.1" min="0" max="100" value="0.2" required/>
+      				</li>
+      			</ol>
+      	</fieldset>
+      	<fieldset>
+      		<legend>Measurement procedure</legend>
+      			<ol>
+      				<li>
+      					<label>Measurement Notification Interval: (ms)</label>
+      					<input type="number" id="app-alert-pause" step="5000" min="0" max="300000" value="25000" required/>
+      				</li>
+      				<li>
+      					<label>Negotiation bandwith time: (ms)</label>
+      					<input type="number" id="bw-time" step="1000" min="1000" max="15000" value="5000" required/>
+      				</li>
+      				<div id="uplink_icon">
+      					<img src="up_red.png" width="32" height="32" alt=" Uplink" />
+      				</div>
+      				<div id="downlink_icon">
+      					<img src="down_red.png" width="32" height="32" alt=" Downlink" />
+      				</div>		
+      				<li>	
+      					<label>Negotiation ping interval: (ms)</label>
+      					<input for=halfsize type="number" id="neg-ping-interval-uplink" step="5" min="0" max="1000" value="50" required/><input for=halfsize type="number" id="neg-ping-interval-downlink" step="5" min="0" max="1000" value="50" required/>
+      				</li>
+      				<li>
+      					<label>Continuity ping interval: (ms)</label>
+      					<input for=halfsize type="number" id="cont-ping-interval-uplink" step="5" min="0" max="1000" value="75" required/><input for=halfsize type="number" id="cont-ping-interval-downlink" step="5" min="0" max="1000" value="75" required/>
+      				</li>
+      				<li>
+      					<label>Latency & Jitter window size: (samples)</label>
+      					<input for=halfsize type="number" id="latency-window-size-uplink" step="5" min="1" max="1000" value="20" required/><input for=halfsize type="number" id="latency-window-size-downlink" step="5" min="1" max="1000" value="20" required/>
+      				</li>
+      				<li>
+      				   <label>PacketLoss window size: (samples)</label>
+      				   <input for=halfsize type="number" id="packetloss-window-size-uplink" step="5" min="1" max="10000" value="1000" required/><input for=halfsize type="number" id="packetloss-window-size-downlink" step="5" min="1" max="10000" value="1000" required/>
+							</li>
+						</ol>
+      	</fieldset>	
+      
+			</form>
+      
+  </body>
+</html>
