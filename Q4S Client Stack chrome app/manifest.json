@@ -1,13 +1,13 @@
     {
-       "name": "SmartStream Q4S Client",
-       "version": "0.1",
+       "name": "Q4S SmartStream StandAlone Client",
+       "version": "0.0.9",
        "manifest_version": 2,
        "app": {
          "background": {
            "scripts":["main.js"]
           }
         },
-       "description": "Q4S Client Stack",
+       "description": "SmartStream Q4S Client",
        "minimum_chrome_version": "23",
        "icons": {
           "128": "icon_128.png",
@@ -19,8 +19,7 @@
                            "tcp-connect",
                            "tcp-listen"
                          ]},
-                       "notifications",
-                       "background"
+                       "notifications"
                        ]                 
     }
 

@@ -93,18 +93,55 @@
 	var div_error;
   var div_conn;
   var div_ok;
+  var div_1_step;
+  var div_2_step;
+  var div_3_step;
   
   
 window.addEventListener("load", function() {
 	
 	document.body.classList.add('signed-out');
+	
+	div_1_step = document.getElementById('first-step');
+    div_1_step.style.display = 'block';
+    
+    div_2_step = document.getElementById('second-step');
+    div_2_step.style.display = 'none';
+    
+    div_3_step = document.getElementById('third-step');
+    div_3_step.style.display = 'none';
   
   
   var start = document.getElementById("begin_q4s");
   var stop = document.getElementById("cancel_q4s");
 
+   var s1 = document.getElementById("1s");
+   var s2 = document.getElementById("2s");
+   var s3 = document.getElementById("3s");
+
+   s2.onclick = function(ev) {
+   
+   	div_1_step.style.display = 'none';
+  	div_2_step.style.display = 'block';
+  	div_3_step.style.display = 'none';
+   }
+   
+   s3.onclick = function(ev) {
+   	div_1_step.style.display = 'none';
+  	div_2_step.style.display = 'none';
+  	div_3_step.style.display = 'block';
+   }
+   
+   s1.onclick = function(ev) {
+    div_1_step.style.display = 'block';
+  	div_2_step.style.display = 'none';
+  	div_3_step.style.display = 'none';
+   }
 
   start.onclick = function(ev) {
+  	
+  	
+  	
   	document.getElementById("begin_q4s").disabled=true;
   	
   	div_error = document.getElementById('connection-error');
@@ -114,7 +151,7 @@ window.addEventListener("load", function() {
     div_ok.style.display = 'none';
     
     div_conn = document.getElementById('connecting');
-    div_conn.style.display = '';
+    div_conn.style.display = 'block';
   	
   	SERVER_ADDRESS = (document.getElementById("server-address")).value;
   	SERVER_TCP_PORT = parseInt((document.getElementById("server-tcp-port")).value);
@@ -176,7 +213,7 @@ window.addEventListener("load", function() {
     socket.on('error', function(e){
     	socket = null;
     	div_conn.style.display = 'none';
-    	div_error.style.display = '';
+    	div_error.style.display = 'block';
     	console.log("connection error !!");
     	document.getElementById("begin_q4s").disabled=false;
     });
@@ -578,7 +615,7 @@ function sendBWidthMessages(packets2Send){
 
 function continuity_Stage(sid){
 	div_conn.style.display = 'none';
-	div_ok.style.display = '';
+	div_ok.style.display = 'block';
 	document.body.classList.remove('signed-out');
 	document.body.classList.add('signed-in');
 	

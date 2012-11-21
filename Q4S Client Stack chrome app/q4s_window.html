@@ -5,25 +5,16 @@
     <title>Q4S Client Stack</title>
     <script src="socket.io.js"></script>
     <script src="utilsClientQ4S.js"></script>
-    <script src="Q4SClientStack.js"></script>
-    <style>
-    	.signed-in #signed-in,
-      .signed-out #signed-out {
-      opacity: 1;
-      }
-      .signed-in #signed-out,
-      .signed-out #signed-in {
-      display: none;
-      }
-    </style>     
+    <script src="Q4SClientStack.js"></script>   
   </head>
   <body>
   	<div id="q4s_logo">
-      <img src="icon_128_transp.png" width="128" height="71" alt=" Smart Stream logo" />
+      <img src="icon_128_transp.png" width="128" height="71"/>
     </div>
     <div id="q4s_motto">
     	<p>Q4S protocol: the real-time multiplayer games enabler</p>
     </div>  
+    
     <div id="buttons_start_stop">  
       <div id="signed-out" class="container">
        <button id="begin_q4s">Begin Q4S session</button>
@@ -31,30 +22,38 @@
       <div id="signed-in" class="container">
        <button id="cancel_q4s">Cancel Q4S session</button>
       </div>
-    </div>
-    <div id="connection-error" style="display:none">
+    <div id="connection-error" title="Review ports availability at firewall.
+Contact Q4S admin for more details">
     	 <div id="connection-error-icon">	
-       	<img src="exclamation_red.png" width="32" height="32" alt=" Error logo" />
+       	<img src="exclamation_red.png" width="32" height="32" />
        </div>
        <div id="connection-error-text">	
        	<p>Connection Error</p>
        </div>
     </div>
-    <div id="connection-ok" style="display:none">
+    <div id="connection-ok" title="Q4S handshake and negotiation accomplished.
+Measuring quality paraments at continuity phase">
     	 <div id="connection-ok-icon">	
-       	<img src="check_green.png" width="32" height="32" alt=" OK logo" />
+       	<img src="check_green.png" width="32" height="32"/>
        </div>
        <div id="connection-ok-text">	
        	<p>Connected</p>
        </div>
     </div>
-    <div id="connecting" style="display:none">
+    <div id="connecting" title="Establishing Q4S connection">
     	 <p>Connecting...</p>
-    </div>  
+    </div>
+    </div>
       
       
+      <div class="button-group">
+             <a id="1s" class="btn">Q4S server</a>
+             <a id="2s" class="btn">Application constraints</a>
+             <a id="3s" class="btn">Measurement procedure</a>
+         </div>  
     
       <form id=q4s_options>
+      	<div id="first-step">
       	<fieldset>
       		<legend>Q4S Server</legend>
       			<ol>
@@ -70,6 +69,8 @@
       				</li>
       			</ol>
       	</fieldset>
+      	</div>
+      	<div id="second-step">
       	<fieldset>   
       		<legend>Application constraints</legend>
       			<ol>
@@ -78,10 +79,10 @@
       					<input type="number" id="app-latency" step="5" min="0" max="1000" value="50" required/>
       				</li>
       				<div id="uplink_icon">
-      					<img src="up_red.png" width="32" height="32" alt=" Uplink" />
+      					<img src="up_red.png" width="32" height="32" title="Uplink" />
       				</div>
       				<div id="downlink_icon">
-      					<img src="down_red.png" width="32" height="32" alt=" Downlink" />
+      					<img src="down_red.png" width="32" height="32" title="Downlink" />
       				</div>	
       				<li>		
       					<label>Application Jitter:</label>
@@ -97,6 +98,8 @@
       				</li>
       			</ol>
       	</fieldset>
+      	</div>
+      	<div id="third-step">
       	<fieldset>
       		<legend>Measurement procedure</legend>
       			<ol>
@@ -109,10 +112,10 @@
       					<input type="number" id="bw-time" step="1000" min="1000" max="15000" value="5000" required/>
       				</li>
       				<div id="uplink_icon">
-      					<img src="up_red.png" width="32" height="32" alt=" Uplink" />
+      					<img src="up_red.png" width="32" height="32" title="Uplink" />
       				</div>
       				<div id="downlink_icon">
-      					<img src="down_red.png" width="32" height="32" alt=" Downlink" />
+      					<img src="down_red.png" width="32" height="32" title="Downlink" />
       				</div>		
       				<li>	
       					<label>Negotiation ping interval: (ms)</label>
@@ -131,9 +134,12 @@
       				   <input for=halfsize type="number" id="packetloss-window-size-uplink" step="5" min="1" max="10000" value="1000" required/><input for=halfsize type="number" id="packetloss-window-size-downlink" step="5" min="1" max="10000" value="1000" required/>
 							</li>
 						</ol>
-      	</fieldset>	
-      
+      	</fieldset>
+      	</div>
 			</form>
-      
+			
+			    
+          
+     
   </body>
 </html>
